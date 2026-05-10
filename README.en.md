@@ -57,6 +57,22 @@ Build artifact:
 dist/飞连路由助手.app
 ```
 
+## Release
+
+GitHub Actions is configured to publish releases automatically. After a `v*` tag is pushed, Actions builds the app on macOS and uploads the packaged `.app` as release assets.
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Release assets:
+
+```text
+FeilianRouteHelper-v1.0.0-macOS.zip
+FeilianRouteHelper-v1.0.0-macOS.zip.sha256
+```
+
 ## Usage
 
 1. Connect to Feilian VPN

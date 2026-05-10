@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build macOS app and publish release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app
+        run: ./scripts/build.sh
+
+      - name: Package app
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          APP_NAME="飞连路由助手"
+          PACKAGE_NAME="FeilianRouteHelper-${VERSION}-macOS.zip"
+
+          mkdir -p release
+          ditto -c -k --sequesterRsrc --keepParent "dist/${APP_NAME}.app" "release/${PACKAGE_NAME}"
+          shasum -a 256 "release/${PACKAGE_NAME}" > "release/${PACKAGE_NAME}.sha256"
+
+          {
+            echo "PACKAGE_NAME=${PACKAGE_NAME}"
+            echo "PACKAGE_PATH=release/${PACKAGE_NAME}"
+            echo "CHECKSUM_PATH=release/${PACKAGE_NAME}.sha256"
+          } >> "$GITHUB_ENV"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$PACKAGE_PATH" "$CHECKSUM_PATH" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "$PACKAGE_PATH" \
+              "$CHECKSUM_PATH" \
+              --title "$GITHUB_REF_NAME" \
+              --notes "macOS app build for $GITHUB_REF_NAME."
+          fi

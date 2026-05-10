@@ -57,6 +57,22 @@ devplatform-cn.abc.biz
 dist/飞连路由助手.app
 ```
 
+## 发布版本
+
+项目已配置 GitHub Actions 自动发布。推送 `v*` 格式的 tag 后，Actions 会在 macOS 环境构建应用，并将 `.app` 打包为 Release 下载附件。
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+发布后可在 GitHub Releases 中下载：
+
+```text
+FeilianRouteHelper-v1.0.0-macOS.zip
+FeilianRouteHelper-v1.0.0-macOS.zip.sha256
+```
+
 ## 使用
 
 1. 连接飞连 VPN
