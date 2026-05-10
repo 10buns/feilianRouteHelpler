@@ -68,6 +68,14 @@ dist/飞连路由助手.app
 7. Click `绑定飞连路由`
 8. Check the execution result in the log area
 
+If the log shows:
+
+```text
+route: must be root to alter routing table
+```
+
+click `终端执行绑定`. The app will open Terminal and run the binding script with `sudo`. Enter the current macOS user password when prompted.
+
 Domain configuration is saved at:
 
 ```text
