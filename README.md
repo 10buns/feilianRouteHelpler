@@ -6,7 +6,7 @@
 
 ## 应用截图
 
-![飞连路由助手应用截图](screshoot/app-screenshot-window.png)
+![飞连路由助手应用截图](screenshot/app-screenshot-window.png)
 
 作者：[@10buns](https://github.com/10buns)  
 邮箱：loverichy8@gmail.com

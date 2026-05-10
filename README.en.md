@@ -6,7 +6,7 @@ A lightweight macOS desktop utility for binding internal IPs resolved from speci
 
 ## Screenshot
 
-![Feilian Route Helper app screenshot](screshoot/app-screenshot-window.png)
+![Feilian Route Helper app screenshot](screenshot/app-screenshot-window.png)
 
 Author: [@10buns](https://github.com/10buns)  
 Email: loverichy8@gmail.com
