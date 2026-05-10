@@ -31,7 +31,7 @@
     self.scriptPath = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"bind-feilian-routes.sh"];
 
     if (![[NSFileManager defaultManager] fileExistsAtPath:self.configPath]) {
-        [@"devplatform-cn.abc.biz\n" writeToFile:self.configPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [@"devplatform-cn.bwcj.biz\n" writeToFile:self.configPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
 }
 
@@ -61,10 +61,12 @@
     NSButton *saveButton = [self buttonWithTitle:@"保存域名" action:@selector(saveHosts:) frame:NSMakeRect(20, 365, 110, 32)];
     NSButton *loadButton = [self buttonWithTitle:@"重新读取" action:@selector(loadHosts:) frame:NSMakeRect(140, 365, 110, 32)];
     NSButton *bindButton = [self buttonWithTitle:@"绑定飞连路由" action:@selector(bindRoutes:) frame:NSMakeRect(260, 365, 140, 32)];
-    NSButton *clearButton = [self buttonWithTitle:@"清空日志" action:@selector(clearLogs:) frame:NSMakeRect(410, 365, 110, 32)];
+    NSButton *terminalBindButton = [self buttonWithTitle:@"终端执行绑定" action:@selector(openTerminalBind:) frame:NSMakeRect(410, 365, 130, 32)];
+    NSButton *clearButton = [self buttonWithTitle:@"清空日志" action:@selector(clearLogs:) frame:NSMakeRect(550, 365, 110, 32)];
     [content addSubview:saveButton];
     [content addSubview:loadButton];
     [content addSubview:bindButton];
+    [content addSubview:terminalBindButton];
     [content addSubview:clearButton];
 
     NSTextField *configLabel = [self labelWithString:@"代理配置文件（写入真实解析 + DIRECT 规则）" frame:NSMakeRect(20, 326, 520, 22)];
@@ -97,6 +99,7 @@
     [content addSubview:authorLabel];
 
     [self appendLog:@"提示：飞连连接后，点击“绑定飞连路由”。系统会请求管理员权限用于添加路由。\n"];
+    [self appendLog:@"提示：如果日志出现 must be root，请点击“终端执行绑定”，在 Terminal 中输入 sudo 密码执行。\n"];
     [self appendLog:@"提示：如需修改 Shadowrocket/Clash 配置，先选择配置文件，再点击“写入代理规则”。写入前会自动备份。\n"];
     [self appendLog:@"说明：Shadowrocket 写入 always-real-ip + DIRECT；Clash/Mihomo 写入 fake-ip-filter + DIRECT，fake-ip-filter 是否生效取决于客户端内核。\n"];
     [self.window makeKeyAndOrderFront:nil];
@@ -146,7 +149,7 @@
 
 - (void)loadHosts:(id)sender {
     NSString *hosts = [NSString stringWithContentsOfFile:self.configPath encoding:NSUTF8StringEncoding error:nil];
-    self.hostsTextView.string = hosts ?: @"devplatform-cn.abc.biz\n";
+    self.hostsTextView.string = hosts ?: @"devplatform-cn.bwcj.biz\n";
     [self appendLog:[NSString stringWithFormat:@"已读取域名配置：%@\n", self.configPath]];
 }
 
@@ -237,6 +240,56 @@
 
     AuthorizationFree(auth, kAuthorizationFlagDefaults);
     [self appendLog:@"绑定完成。\n"];
+}
+
+- (NSString *)shellQuoted:(NSString *)value {
+    NSString *escaped = [value stringByReplacingOccurrencesOfString:@"'" withString:@"'\\''"];
+    return [NSString stringWithFormat:@"'%@'", escaped];
+}
+
+- (void)openTerminalBind:(id)sender {
+    [self saveHosts:nil];
+
+    NSArray *dirs = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+    NSString *supportDir = [[dirs firstObject] stringByAppendingPathComponent:@"FeilianRouteHelper"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:supportDir withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *commandPath = [supportDir stringByAppendingPathComponent:@"bind-routes.command"];
+
+    NSString *command = [NSString stringWithFormat:
+        @"#!/bin/bash\n"
+         "clear\n"
+         "echo '飞连路由助手 - 终端执行绑定'\n"
+         "echo '需要输入当前 macOS 用户密码以获取 sudo 权限。'\n"
+         "echo\n"
+         "sudo /bin/bash %@ %@\n"
+         "STATUS=$?\n"
+         "echo\n"
+         "if [ \"$STATUS\" -eq 0 ]; then\n"
+         "  echo '执行完成。'\n"
+         "else\n"
+         "  echo \"执行失败，退出码：$STATUS\"\n"
+         "fi\n"
+         "echo\n"
+         "read -r -p '按回车关闭窗口...'\n",
+         [self shellQuoted:self.scriptPath],
+         [self shellQuoted:self.configPath]];
+
+    NSError *error = nil;
+    if (![command writeToFile:commandPath atomically:YES encoding:NSUTF8StringEncoding error:&error]) {
+        [self appendLog:[NSString stringWithFormat:@"生成终端执行脚本失败：%@\n", error.localizedDescription]];
+        return;
+    }
+    [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions: @0755} ofItemAtPath:commandPath error:nil];
+
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = @"/usr/bin/open";
+    task.arguments = @[@"-a", @"Terminal", commandPath];
+    @try {
+        [task launch];
+        [self appendLog:@"已打开 Terminal 执行绑定命令，请在终端中输入 sudo 密码。\n"];
+    } @catch (NSException *exception) {
+        [self appendLog:[NSString stringWithFormat:@"打开 Terminal 失败：%@\n", exception.reason]];
+    }
 }
 
 - (NSArray<NSString *> *)currentHosts {

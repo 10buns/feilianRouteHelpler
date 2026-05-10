@@ -9,6 +9,8 @@ if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
   exit 1
 fi
 
+echo "执行用户 UID：$(/usr/bin/id -u)"
+
 FEILIAN_IFACE=$(/sbin/ifconfig | /usr/bin/awk '
   /^utun[0-9]+:/ {
     iface=$1
@@ -70,12 +72,19 @@ while IFS= read -r TARGET_HOST; do
       continue
     fi
 
-    /sbin/route -n delete -host "$TARGET_IP" >/dev/null 2>&1
+    DELETE_OUTPUT=$(/sbin/route -n delete -host "$TARGET_IP" 2>&1)
+    DELETE_STATUS=$?
+    if [ "$DELETE_STATUS" -ne 0 ] && ! printf '%s' "$DELETE_OUTPUT" | /usr/bin/grep -qi 'not in table'; then
+      echo "  删除旧路由提示：$DELETE_OUTPUT"
+    fi
 
-    if /sbin/route -n add -host "$TARGET_IP" -interface "$FEILIAN_IFACE" >/dev/null 2>&1; then
+    ADD_OUTPUT=$(/sbin/route -n add -host "$TARGET_IP" -interface "$FEILIAN_IFACE" 2>&1)
+    ADD_STATUS=$?
+    if [ "$ADD_STATUS" -eq 0 ]; then
       echo "  绑定成功：$TARGET_IP -> $FEILIAN_IFACE"
     else
       echo "  绑定失败：$TARGET_IP -> $FEILIAN_IFACE"
+      echo "  route add 输出：$ADD_OUTPUT"
     fi
   done <<EOF
 $TARGET_IPS
@@ -83,4 +92,3 @@ EOF
 done <<EOF
 $HOSTS
 EOF
-
