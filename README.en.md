@@ -4,6 +4,10 @@
 
 A lightweight macOS desktop utility for binding internal IPs resolved from specific company domains to the Feilian VPN route when Feilian VPN is used together with Shadowrocket, Clash, or Mihomo.
 
+## Screenshot
+
+![Feilian Route Helper app screenshot](screshoot/app-screenshot-window.png)
+
 Author: [@10buns](https://github.com/10buns)  
 Email: loverichy8@gmail.com
 
