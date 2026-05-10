@@ -1,5 +1,7 @@
 # 飞连路由助手
 
+[中文](README.md) | [English](README.en.md)
+
 一个用于 macOS 的轻量桌面工具，帮助在同时使用飞连 VPN 与 Shadowrocket / Clash / Mihomo 时，将指定公司域名解析到的内网 IP 绑定到飞连 VPN 路由。
 
 作者：[@10buns](https://github.com/10buns)  
@@ -139,4 +141,3 @@ route -n add -host <解析出的IP> -interface <飞连utun接口>
 ## License
 
 MIT
-
