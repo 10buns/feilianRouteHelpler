@@ -58,13 +58,15 @@
     hostsScroll.documentView = self.hostsTextView;
     [content addSubview:hostsScroll];
 
-    NSButton *saveButton = [self buttonWithTitle:@"保存域名" action:@selector(saveHosts:) frame:NSMakeRect(20, 365, 110, 32)];
-    NSButton *loadButton = [self buttonWithTitle:@"重新读取" action:@selector(loadHosts:) frame:NSMakeRect(140, 365, 110, 32)];
-    NSButton *bindButton = [self buttonWithTitle:@"绑定飞连路由" action:@selector(bindRoutes:) frame:NSMakeRect(260, 365, 140, 32)];
-    NSButton *terminalBindButton = [self buttonWithTitle:@"终端执行绑定" action:@selector(openTerminalBind:) frame:NSMakeRect(410, 365, 130, 32)];
-    NSButton *clearButton = [self buttonWithTitle:@"清空日志" action:@selector(clearLogs:) frame:NSMakeRect(550, 365, 110, 32)];
+    NSButton *saveButton = [self buttonWithTitle:@"保存域名" action:@selector(saveHosts:) frame:NSMakeRect(20, 365, 100, 32)];
+    NSButton *loadButton = [self buttonWithTitle:@"重新读取" action:@selector(loadHosts:) frame:NSMakeRect(130, 365, 100, 32)];
+    NSButton *redirectButton = [self buttonWithTitle:@"补全跳转域名" action:@selector(discoverRedirectHosts:) frame:NSMakeRect(240, 365, 130, 32)];
+    NSButton *bindButton = [self buttonWithTitle:@"绑定飞连路由" action:@selector(bindRoutes:) frame:NSMakeRect(380, 365, 130, 32)];
+    NSButton *terminalBindButton = [self buttonWithTitle:@"终端执行绑定" action:@selector(openTerminalBind:) frame:NSMakeRect(520, 365, 120, 32)];
+    NSButton *clearButton = [self buttonWithTitle:@"清空日志" action:@selector(clearLogs:) frame:NSMakeRect(650, 365, 100, 32)];
     [content addSubview:saveButton];
     [content addSubview:loadButton];
+    [content addSubview:redirectButton];
     [content addSubview:bindButton];
     [content addSubview:terminalBindButton];
     [content addSubview:clearButton];
@@ -100,6 +102,7 @@
 
     [self appendLog:@"提示：飞连连接后，点击“绑定飞连路由”。系统会请求管理员权限用于添加路由。\n"];
     [self appendLog:@"提示：如果日志出现 must be root，请点击“终端执行绑定”，在 Terminal 中输入 sudo 密码执行。\n"];
+    [self appendLog:@"提示：如果网页访问发生 30x 跳转，先点击“补全跳转域名”，再写入代理规则并绑定飞连路由。\n"];
     [self appendLog:@"提示：如需修改 Shadowrocket/Clash 配置，先选择配置文件，再点击“写入代理规则”。写入前会自动备份。\n"];
     [self appendLog:@"说明：Shadowrocket 写入 always-real-ip + DIRECT；Clash/Mihomo 写入 fake-ip-filter + DIRECT，fake-ip-filter 是否生效取决于客户端内核。\n"];
     [self.window makeKeyAndOrderFront:nil];
@@ -180,6 +183,7 @@
         if (host.length == 0 || [host hasPrefix:@"#"]) {
             continue;
         }
+        host = [self hostFromInput:host] ?: host;
         if ([host containsString:@"*"]) {
             [self appendLog:[NSString stringWithFormat:@"跳过通配符域名：%@\n", host]];
             continue;
@@ -197,6 +201,109 @@
         [result appendFormat:@"%@\n", host];
     }
     return result;
+}
+
+- (NSString *)hostFromInput:(NSString *)input {
+    NSString *trimmed = [input stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSURLComponents *components = [NSURLComponents componentsWithString:trimmed];
+    if (components.host.length > 0) {
+        return components.host.lowercaseString;
+    }
+
+    if ([trimmed containsString:@"://"]) {
+        return nil;
+    }
+
+    components = [NSURLComponents componentsWithString:[@"https://" stringByAppendingString:trimmed]];
+    return components.host.lowercaseString;
+}
+
+- (void)discoverRedirectHosts:(id)sender {
+    NSString *cleaned = [self cleanedHostsFromString:self.hostsTextView.string];
+    NSArray<NSString *> *hosts = [self hostsFromCleanedString:cleaned];
+    if (hosts.count == 0) {
+        [self appendLog:@"跳转检测失败：域名列表为空。\n"];
+        return;
+    }
+
+    NSMutableOrderedSet<NSString *> *merged = [NSMutableOrderedSet orderedSetWithArray:hosts];
+    [self appendLog:@"开始检测 30x 跳转域名...\n"];
+
+    for (NSString *host in hosts) {
+        for (NSString *scheme in @[@"https", @"http"]) {
+            NSString *url = [NSString stringWithFormat:@"%@://%@", scheme, host];
+            for (NSString *redirectHost in [self redirectHostsForURL:url]) {
+                if (redirectHost.length == 0 || [redirectHost isEqualToString:host]) {
+                    continue;
+                }
+                if (![merged containsObject:redirectHost]) {
+                    [merged addObject:redirectHost];
+                    [self appendLog:[NSString stringWithFormat:@"发现跳转域名：%@ -> %@\n", host, redirectHost]];
+                }
+            }
+        }
+    }
+
+    NSMutableString *result = [NSMutableString string];
+    for (NSString *host in merged) {
+        [result appendFormat:@"%@\n", host];
+    }
+    self.hostsTextView.string = result;
+    [result writeToFile:self.configPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [self appendLog:@"跳转域名检测完成，域名配置已保存。请重新写入代理规则并绑定飞连路由。\n"];
+}
+
+- (NSArray<NSString *> *)hostsFromCleanedString:(NSString *)cleaned {
+    NSMutableArray<NSString *> *hosts = [NSMutableArray array];
+    for (NSString *line in [cleaned componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
+        NSString *host = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (host.length > 0) {
+            [hosts addObject:host];
+        }
+    }
+    return hosts;
+}
+
+- (NSArray<NSString *> *)redirectHostsForURL:(NSString *)url {
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = @"/usr/bin/curl";
+    task.arguments = @[@"-kLsS", @"-D", @"-", @"-o", @"/dev/null", @"--connect-timeout", @"5", @"--max-time", @"15", @"--max-redirs", @"8", @"-w", @"\n__FINAL_URL__%{url_effective}\n", url];
+
+    NSPipe *pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError = [NSPipe pipe];
+
+    @try {
+        [task launch];
+        [task waitUntilExit];
+    } @catch (NSException *exception) {
+        [self appendLog:[NSString stringWithFormat:@"跳转检测执行失败：%@\n", url]];
+        return @[];
+    }
+
+    NSData *data = [[pipe fileHandleForReading] readDataToEndOfFile];
+    NSString *output = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    if (task.terminationStatus != 0 || output.length == 0) {
+        [self appendLog:[NSString stringWithFormat:@"未检测到跳转：%@\n", url]];
+        return @[];
+    }
+
+    NSMutableOrderedSet<NSString *> *hosts = [NSMutableOrderedSet orderedSet];
+    for (NSString *line in [output componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
+        NSString *trimmed = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *candidate = nil;
+        if ([trimmed.lowercaseString hasPrefix:@"location:"]) {
+            candidate = [trimmed substringFromIndex:[@"location:" length]];
+        } else if ([trimmed hasPrefix:@"__FINAL_URL__"]) {
+            candidate = [trimmed substringFromIndex:[@"__FINAL_URL__" length]];
+        }
+
+        NSString *host = [self hostFromInput:[candidate stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @""];
+        if (host.length > 0) {
+            [hosts addObject:host];
+        }
+    }
+    return hosts.array;
 }
 
 - (void)bindRoutes:(id)sender {

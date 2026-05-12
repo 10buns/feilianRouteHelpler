@@ -79,10 +79,11 @@ FeilianRouteHelper-v1.0.0-macOS.zip.sha256
 2. Open `飞连路由助手.app`
 3. Enter full domains in the domain text box, one domain per line
 4. Click `保存域名`
-5. To update a proxy config, click `选择配置` and select a Shadowrocket `.conf` file or a Clash / Mihomo `.yaml/.yml` file
-6. Click `写入代理规则`
-7. Click `绑定飞连路由`
-8. Check the execution result in the log area
+5. If the website uses 30x redirects, click `补全跳转域名`
+6. To update a proxy config, click `选择配置` and select a Shadowrocket `.conf` file or a Clash / Mihomo `.yaml/.yml` file
+7. Click `写入代理规则`
+8. Click `绑定飞连路由`
+9. Check the execution result in the log area
 
 If the log shows:
 
@@ -131,6 +132,16 @@ rules:
 
 Note: Whether `fake-ip-filter` takes effect depends on the Clash / Mihomo client and core configuration. If it does not take effect, the tool still falls back to real DNS resolution and Feilian route binding.
 
+## Handling 30x Redirects
+
+If a website redirects to another domain, click `补全跳转域名` first. The tool follows `http` / `https` redirects for the current domains and appends every `Location` host plus the final redirected host to the domain list.
+
+After that, run these steps again:
+
+1. `写入代理规则`
+2. Reload the config in Shadowrocket / Clash / Mihomo
+3. `绑定飞连路由`
+
 ## DNS Refresh
 
 After proxy rules are written successfully, the tool refreshes the macOS DNS cache automatically:
@@ -149,7 +160,7 @@ The tool will:
 1. Read full domains from the domain list
 2. Resolve domain IPs using macOS DNS
 3. Skip `198.18.*` / `198.19.*` fake IPs
-4. Automatically find the `utun` interface where Feilian assigns a `172.16.*.*` address
+4. Automatically scan current `utun` interfaces, skip common proxy fake-IP ranges, and detect the private or fast-mode address assigned by Feilian
 5. Run a command similar to:
 
 ```bash
