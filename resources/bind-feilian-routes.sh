@@ -68,6 +68,59 @@ fi
 echo "飞连接口：$FEILIAN_IFACE"
 echo "飞连接口地址：$FEILIAN_IP"
 
+resolve_host() {
+  local host="$1"
+  local raw_file parsed_file pid waited status timed_out dns_servers server
+
+  raw_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/feilian-route-dns.XXXXXX") || return 1
+  parsed_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/feilian-route-ips.XXXXXX") || {
+    /bin/rm -f "$raw_file"
+    return 1
+  }
+
+  /usr/bin/dscacheutil -q host -a name "$host" >"$raw_file" 2>/dev/null &
+  pid=$!
+  waited=0
+  timed_out=0
+  while /bin/kill -0 "$pid" 2>/dev/null; do
+    if [ "$waited" -ge 8 ]; then
+      /bin/kill "$pid" 2>/dev/null || true
+      /bin/sleep 1
+      /bin/kill -9 "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      timed_out=1
+      echo "  系统 DNS 解析超时，尝试使用当前 DNS 服务器直接解析。" >&2
+      break
+    fi
+    /bin/sleep 1
+    waited=$((waited + 1))
+  done
+
+  if [ "$timed_out" -eq 1 ]; then
+    status=124
+  else
+    wait "$pid" 2>/dev/null
+    status=$?
+  fi
+
+  /usr/bin/awk '/ip_address:/ {print $2}' "$raw_file" >>"$parsed_file"
+
+  if [ ! -s "$parsed_file" ] && [ -x /usr/bin/dig ]; then
+    dns_servers=$(/usr/sbin/scutil --dns 2>/dev/null | /usr/bin/awk '/nameserver\[[0-9]+\] : [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ {print $3}' | /usr/bin/sort -u)
+    while IFS= read -r server; do
+      [ -z "$server" ] && continue
+      /usr/bin/dig @"$server" "$host" A +short +time=3 +tries=1 2>/dev/null | /usr/bin/awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print}' >>"$parsed_file"
+      [ -s "$parsed_file" ] && break
+    done <<EOF
+$dns_servers
+EOF
+  fi
+
+  /usr/bin/sort -u "$parsed_file"
+  /bin/rm -f "$raw_file" "$parsed_file"
+  return "$status"
+}
+
 HOSTS=$(/usr/bin/awk '
   /^[[:space:]]*$/ { next }
   /^[[:space:]]*#/ { next }
@@ -86,7 +139,7 @@ while IFS= read -r TARGET_HOST; do
   [ -z "$TARGET_HOST" ] && continue
   echo "处理域名：$TARGET_HOST"
 
-  TARGET_IPS=$(/usr/bin/dscacheutil -q host -a name "$TARGET_HOST" | /usr/bin/awk '/ip_address:/ {print $2}' | /usr/bin/sort -u)
+  TARGET_IPS=$(resolve_host "$TARGET_HOST")
 
   if [ -z "$TARGET_IPS" ]; then
     echo "  无法解析：$TARGET_HOST"

@@ -158,7 +158,7 @@ This operation may require administrator authorization.
 The tool will:
 
 1. Read full domains from the domain list
-2. Resolve domain IPs using macOS DNS
+2. Resolve domain IPs using macOS DNS; if the system resolver hangs in Feilian fast mode, it times out after 8 seconds and retries against the current DNS servers directly
 3. Skip `198.18.*` / `198.19.*` fake IPs
 4. Automatically scan current `utun` interfaces, skip common proxy fake-IP ranges, and detect the private or fast-mode address assigned by Feilian
 5. Run a command similar to:
