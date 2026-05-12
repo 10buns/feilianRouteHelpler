@@ -82,16 +82,16 @@ FeilianRouteHelper-v1.0.0-macOS.zip.sha256
 5. 如果网页访问存在 30x 跳转，点击 `补全跳转域名`
 6. 如需更新代理配置，点击 `选择配置`，选择 Shadowrocket `.conf` 或 Clash / Mihomo `.yaml/.yml`
 7. 点击 `写入代理规则`
-8. 点击 `绑定飞连路由`
+8. 点击 `终端绑定路由`
 9. 在日志区域查看执行结果
 
-如果日志提示：
+终端会提示：
 
 ```text
-route: must be root to alter routing table
+需要输入当前 macOS 用户密码以获取 sudo 权限。
 ```
 
-请点击 `终端执行绑定`，应用会打开 Terminal 并通过 `sudo` 执行绑定脚本。按提示输入当前 macOS 用户密码即可。
+应用会打开 Terminal 并通过 `sudo` 执行绑定脚本。按提示输入当前 macOS 用户密码即可。
 
 域名配置保存在：
 
@@ -140,7 +140,7 @@ rules:
 
 1. `写入代理规则`
 2. 在 Shadowrocket / Clash / Mihomo 中重新加载配置
-3. `绑定飞连路由`
+3. `终端绑定路由`
 
 ## DNS 刷新
 
@@ -174,7 +174,7 @@ route -n add -host <解析出的IP> -interface <飞连utun接口>
 - 不支持 `*.abc.biz` 这类通配符域名作为路由绑定输入
 - macOS 路由只能按 IP 生效，工具会先解析具体域名，再绑定解析出的 IP
 - 飞连重连、网络切换或系统重启后，临时路由可能失效
-- 每次飞连重新连接后，建议打开应用重新点击 `绑定飞连路由`
+- 每次飞连重新连接后，建议打开应用重新点击 `终端绑定路由`
 - 长期稳定方案仍然是让飞连客户端或飞连管理后台下发对应内网路由
 
 ## License

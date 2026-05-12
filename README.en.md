@@ -82,16 +82,16 @@ FeilianRouteHelper-v1.0.0-macOS.zip.sha256
 5. If the website uses 30x redirects, click `补全跳转域名`
 6. To update a proxy config, click `选择配置` and select a Shadowrocket `.conf` file or a Clash / Mihomo `.yaml/.yml` file
 7. Click `写入代理规则`
-8. Click `绑定飞连路由`
+8. Click `终端绑定路由`
 9. Check the execution result in the log area
 
-If the log shows:
+The terminal will show:
 
 ```text
-route: must be root to alter routing table
+需要输入当前 macOS 用户密码以获取 sudo 权限。
 ```
 
-click `终端执行绑定`. The app will open Terminal and run the binding script with `sudo`. Enter the current macOS user password when prompted.
+The app will open Terminal and run the binding script with `sudo`. Enter the current macOS user password when prompted.
 
 Domain configuration is saved at:
 
@@ -140,7 +140,7 @@ After that, run these steps again:
 
 1. `写入代理规则`
 2. Reload the config in Shadowrocket / Clash / Mihomo
-3. `绑定飞连路由`
+3. `终端绑定路由`
 
 ## DNS Refresh
 
@@ -174,7 +174,7 @@ Route binding requires administrator privileges.
 - Wildcard domains such as `*.abc.biz` are not supported as route binding input
 - macOS routes work by IP, so the tool resolves full domains first and then binds the resolved IPs
 - Temporary routes may become invalid after Feilian reconnects, the network changes, or the system restarts
-- After Feilian reconnects, it is recommended to open the app and click `绑定飞连路由` again
+- After Feilian reconnects, it is recommended to open the app and click `终端绑定路由` again
 - The long-term stable solution is still to let the Feilian client or Feilian admin backend distribute the required internal routes
 
 ## License

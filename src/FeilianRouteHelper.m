@@ -61,13 +61,11 @@
     NSButton *saveButton = [self buttonWithTitle:@"保存域名" action:@selector(saveHosts:) frame:NSMakeRect(20, 365, 100, 32)];
     NSButton *loadButton = [self buttonWithTitle:@"重新读取" action:@selector(loadHosts:) frame:NSMakeRect(130, 365, 100, 32)];
     NSButton *redirectButton = [self buttonWithTitle:@"补全跳转域名" action:@selector(discoverRedirectHosts:) frame:NSMakeRect(240, 365, 130, 32)];
-    NSButton *bindButton = [self buttonWithTitle:@"绑定飞连路由" action:@selector(bindRoutes:) frame:NSMakeRect(380, 365, 130, 32)];
-    NSButton *terminalBindButton = [self buttonWithTitle:@"终端执行绑定" action:@selector(openTerminalBind:) frame:NSMakeRect(520, 365, 120, 32)];
-    NSButton *clearButton = [self buttonWithTitle:@"清空日志" action:@selector(clearLogs:) frame:NSMakeRect(650, 365, 100, 32)];
+    NSButton *terminalBindButton = [self buttonWithTitle:@"终端绑定路由" action:@selector(openTerminalBind:) frame:NSMakeRect(380, 365, 120, 32)];
+    NSButton *clearButton = [self buttonWithTitle:@"清空日志" action:@selector(clearLogs:) frame:NSMakeRect(510, 365, 100, 32)];
     [content addSubview:saveButton];
     [content addSubview:loadButton];
     [content addSubview:redirectButton];
-    [content addSubview:bindButton];
     [content addSubview:terminalBindButton];
     [content addSubview:clearButton];
 
@@ -100,9 +98,8 @@
     authorLabel.textColor = [NSColor secondaryLabelColor];
     [content addSubview:authorLabel];
 
-    [self appendLog:@"提示：飞连连接后，点击“绑定飞连路由”。系统会请求管理员权限用于添加路由。\n"];
-    [self appendLog:@"提示：如果日志出现 must be root，请点击“终端执行绑定”，在 Terminal 中输入 sudo 密码执行。\n"];
-    [self appendLog:@"提示：如果网页访问发生 30x 跳转，先点击“补全跳转域名”，再写入代理规则并绑定飞连路由。\n"];
+    [self appendLog:@"提示：飞连连接后，点击“终端绑定路由”，在 Terminal 中输入 sudo 密码执行。\n"];
+    [self appendLog:@"提示：如果网页访问发生 30x 跳转，先点击“补全跳转域名”，再写入代理规则并终端绑定路由。\n"];
     [self appendLog:@"提示：如需修改 Shadowrocket/Clash 配置，先选择配置文件，再点击“写入代理规则”。写入前会自动备份。\n"];
     [self appendLog:@"说明：Shadowrocket 写入 always-real-ip + DIRECT；Clash/Mihomo 写入 fake-ip-filter + DIRECT，fake-ip-filter 是否生效取决于客户端内核。\n"];
     [self.window makeKeyAndOrderFront:nil];
@@ -250,7 +247,7 @@
     }
     self.hostsTextView.string = result;
     [result writeToFile:self.configPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    [self appendLog:@"跳转域名检测完成，域名配置已保存。请重新写入代理规则并绑定飞连路由。\n"];
+    [self appendLog:@"跳转域名检测完成，域名配置已保存。请重新写入代理规则并终端绑定路由。\n"];
 }
 
 - (NSArray<NSString *> *)hostsFromCleanedString:(NSString *)cleaned {
@@ -306,49 +303,6 @@
     return hosts.array;
 }
 
-- (void)bindRoutes:(id)sender {
-    [self saveHosts:nil];
-    [self appendLog:@"开始绑定飞连路由...\n"];
-
-    AuthorizationRef auth = NULL;
-    AuthorizationItem item = { kAuthorizationRightExecute, 0, NULL, 0 };
-    AuthorizationRights rights = { 1, &item };
-    AuthorizationFlags flags = kAuthorizationFlagDefaults | kAuthorizationFlagInteractionAllowed | kAuthorizationFlagPreAuthorize | kAuthorizationFlagExtendRights;
-    OSStatus status = AuthorizationCreate(&rights, kAuthorizationEmptyEnvironment, flags, &auth);
-    if (status != errAuthorizationSuccess || auth == NULL) {
-        [self appendLog:[NSString stringWithFormat:@"授权失败：%d\n", (int)status]];
-        return;
-    }
-
-    const char *tool = "/bin/bash";
-    char *args[] = {
-        (char *)[self.scriptPath fileSystemRepresentation],
-        (char *)[self.configPath fileSystemRepresentation],
-        NULL
-    };
-    FILE *pipe = NULL;
-    status = AuthorizationExecuteWithPrivileges(auth, tool, kAuthorizationFlagDefaults, args, &pipe);
-    if (status != errAuthorizationSuccess) {
-        [self appendLog:[NSString stringWithFormat:@"执行失败：%d\n", (int)status]];
-        AuthorizationFree(auth, kAuthorizationFlagDefaults);
-        return;
-    }
-
-    if (pipe) {
-        char buffer[4096];
-        while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
-            NSString *line = [NSString stringWithUTF8String:buffer];
-            if (line) {
-                [self appendLog:line];
-            }
-        }
-        fclose(pipe);
-    }
-
-    AuthorizationFree(auth, kAuthorizationFlagDefaults);
-    [self appendLog:@"绑定完成。\n"];
-}
-
 - (NSString *)shellQuoted:(NSString *)value {
     NSString *escaped = [value stringByReplacingOccurrencesOfString:@"'" withString:@"'\\''"];
     return [NSString stringWithFormat:@"'%@'", escaped];
@@ -365,7 +319,7 @@
     NSString *command = [NSString stringWithFormat:
         @"#!/bin/bash\n"
          "clear\n"
-         "echo '飞连路由助手 - 终端执行绑定'\n"
+         "echo '飞连路由助手 - 终端绑定路由'\n"
          "echo '需要输入当前 macOS 用户密码以获取 sudo 权限。'\n"
          "echo\n"
          "sudo /bin/bash %@ %@\n"
